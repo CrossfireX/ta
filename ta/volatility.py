@@ -220,15 +220,18 @@ class DonchianChannel(IndicatorMixin):
         fillna(bool): if True, fill nan values.
     """
 
-    def __init__(self, close: pd.Series, n: int = 20, fillna: bool = False):
-        self._close = close
+    def __init__(self, high: pd.Series, low: pd.Series, n: int = 24, fillna: bool = False): 
+    #def __init__(self, close: pd.Series, n: int = 20, fillna: bool = False):
+        self._high = high
+        self._low = low
         self._n = n
         self._fillna = fillna
         self._run()
 
     def _run(self):
-        self._hband = self._close.rolling(self._n, min_periods=0).max()
-        self._lband = self._close.rolling(self._n, min_periods=0).min()
+        self._hband = self._high.rolling(self._n, min_periods=0).max()
+        self._lband = self._low.rolling(self._n, min_periods=0).min()
+        self._mband = ((self._hband + self._lband) / 2.0)
 
     def donchian_channel_hband(self) -> pd.Series:
         """Donchian Channel High Band
@@ -238,6 +241,15 @@ class DonchianChannel(IndicatorMixin):
         """
         hband = self.check_fillna(self._hband, method='backfill')
         return pd.Series(hband, name='dchband')
+
+    def donchian_channel_mband(self) -> pd.Series:
+        """Donchian Channel Middle Band
+
+        Returns:
+            pandas.Series: New feature generated.
+        """
+        mband = self.check_fillna(self._mband, method='backfill')
+        return pd.Series(mband, name='dcmband')
 
     def donchian_channel_lband(self) -> pd.Series:
         """Donchian Channel Low Band
@@ -254,7 +266,7 @@ class DonchianChannel(IndicatorMixin):
         Returns:
             pandas.Series: New feature generated.
         """
-        hband = pd.Series(np.where(self._close >= self._hband, 1.0, 0.0), index=self._close.index)
+        hband = pd.Series(np.where(self._high >= self._hband, 1.0, 0.0), index=self._high.index)
         hband = self.check_fillna(hband, value=0)
         return pd.Series(hband, name='dcihband')
 
@@ -264,7 +276,7 @@ class DonchianChannel(IndicatorMixin):
         Returns:
             pandas.Series: New feature generated.
         """
-        lband = pd.Series(np.where(self._close <= self._lband, 1.0, 0.0), index=self._close.index)
+        lband = pd.Series(np.where(self._low <= self._lband, 1.0, 0.0), index=self._low.index)
         lband = self.check_fillna(lband, value=0)
         return pd.Series(lband, name='dcilband')
 
@@ -499,7 +511,7 @@ def keltner_channel_lband_indicator(high, low, close, n=10, fillna=False):
     return indicator.keltner_channel_lband_indicator()
 
 
-def donchian_channel_hband(close, n=20, fillna=False):
+def donchian_channel_hband(high, low, n=24, fillna=False):
     """Donchian channel (DC)
 
     The upper band marks the highest price of an issue for n periods.
@@ -514,11 +526,11 @@ def donchian_channel_hband(close, n=20, fillna=False):
     Returns:
         pandas.Series: New feature generated.
     """
-    indicator = DonchianChannel(close=close, n=n, fillna=fillna)
+    indicator = DonchianChannel(high=high, low=low, n=n, fillna=fillna)
     return indicator.donchian_channel_hband()
 
 
-def donchian_channel_lband(close, n=20, fillna=False):
+def donchian_channel_lband(high, low, n=24, fillna=False):
     """Donchian channel (DC)
 
     The lower band marks the lowest price for n periods.
@@ -533,11 +545,29 @@ def donchian_channel_lband(close, n=20, fillna=False):
     Returns:
         pandas.Series: New feature generated.
     """
-    indicator = DonchianChannel(close=close, n=n, fillna=fillna)
+    indicator = DonchianChannel(high=high, low=low, n=n, fillna=fillna)
     return indicator.donchian_channel_lband()
 
+def donchian_channel_mband(high, low, n=24, fillna=False):
+    """Donchian channel (DC)
 
-def donchian_channel_hband_indicator(close, n=20, fillna=False):
+    The lower band marks the lowest price for n periods.
+
+    https://www.investopedia.com/terms/d/donchianchannels.asp
+
+    Args:
+        close(pandas.Series): dataset 'Close' column.
+        n(int): n period.
+        fillna(bool): if True, fill nan values.
+
+    Returns:
+        pandas.Series: New feature generated.
+    """
+    indicator = DonchianChannel(high=high, low=low, n=n, fillna=fillna)
+    return indicator.donchian_channel_mband()
+
+
+def donchian_channel_hband_indicator(high, low, n=24, fillna=False):
     """Donchian High Band Indicator
 
     Returns 1, if close is higher than donchian high band channel. Else,
@@ -553,11 +583,11 @@ def donchian_channel_hband_indicator(close, n=20, fillna=False):
     Returns:
         pandas.Series: New feature generated.
     """
-    indicator = DonchianChannel(close=close, n=n, fillna=fillna)
+    indicator = DonchianChannel(high=high, low=low, n=n, fillna=fillna)
     return indicator.donchian_channel_hband_indicator()
 
 
-def donchian_channel_lband_indicator(close, n=20, fillna=False):
+def donchian_channel_lband_indicator(high, low, n=24, fillna=False):
     """Donchian Low Band Indicator
 
     Returns 1, if close is lower than donchian low band channel. Else,
@@ -573,5 +603,5 @@ def donchian_channel_lband_indicator(close, n=20, fillna=False):
     Returns:
         pandas.Series: New feature generated.
     """
-    indicator = DonchianChannel(close=close, n=n, fillna=fillna)
+    indicator = DonchianChannel(high=high, low=low, n=n, fillna=fillna)
     return indicator.donchian_channel_lband_indicator()
