@@ -252,15 +252,48 @@ class IchimokuIndicator(IndicatorMixin):
         fillna(bool): if True, fill nan values.
     """
 
-    def __init__(self, high: pd.Series, low: pd.Series, n1: int = 9, n2: int = 26, n3: int = 52,
+    def __init__(self, high: pd.Series, low: pd.Series, close: pd.Series, n1: int = 9, n2: int = 26, n3: int = 52,
                  visual: bool = False, fillna: bool = False):
         self._high = high
         self._low = low
+        self._close = close
         self._n1 = n1
         self._n2 = n2
         self._n3 = n3
         self._visual = visual
         self._fillna = fillna
+
+    def tenkan(self) -> pd.Series:
+        """Senkou Span A (Leading Span A)
+
+        Returns:
+            pandas.Series: New feature generated.
+        """
+        tenkan_sen = (self._high.rolling(self._n1, min_periods=0).max()
+                      + self._low.rolling(self._n1, min_periods=0).min()) / 2.0
+        return pd.Series(tenkan_sen, name=f'tenkan{self._n1}')
+
+    def kijun(self) -> pd.Series:
+        """Senkou Span A (Leading Span A)
+
+        Returns:
+            pandas.Series: New feature generated.
+        """
+        kijun_sen = (self._high.rolling(self._n2, min_periods=0).max()
+                      + self._low.rolling(self._n2, min_periods=0).min()) / 2.0
+        
+        return pd.Series(kijun_sen, name=f'kijun{self._n2}')
+
+    def chikou(self) -> pd.Series:
+        """Senkou Span A (Leading Span A)
+
+        Returns:
+            pandas.Series: New feature generated.
+        """
+        chikou_span = self._close
+        chikou_span = chikou_span.shift(-30)
+        
+        return pd.Series(chikou_span, name=f'chikou{self._n2}')      
 
     def ichimoku_a(self) -> pd.Series:
         """Senkou Span A (Leading Span A)
@@ -268,12 +301,13 @@ class IchimokuIndicator(IndicatorMixin):
         Returns:
             pandas.Series: New feature generated.
         """
-        conv = 0.5 * (self._high.rolling(self._n1, min_periods=0).max()
-                      + self._low.rolling(self._n1, min_periods=0).min())
-        base = 0.5 * (self._high.rolling(self._n2, min_periods=0).max()
-                      + self._low.rolling(self._n2, min_periods=0).min())
-        spana = 0.5 * (conv + base)
-        spana = spana.shift(self._n2, fill_value=spana.mean()) if self._visual else spana
+        tenkan_sen = (self._high.rolling(self._n1, min_periods=0).max()
+                      + self._low.rolling(self._n1, min_periods=0).min()) / 2.0
+        kijun_sen = (self._high.rolling(self._n2, min_periods=0).max()
+                      + self._low.rolling(self._n2, min_periods=0).min()) / 2.0
+        spana = (tenkan_sen + kijun_sen) / 2.0
+        #spana = spana.shift(self._n2, fill_value=spana.mean()) if self._visual else spana
+        spana = spana.shift(30)
         spana = self.check_fillna(spana, method='backfill')
         return pd.Series(spana, name=f'ichimoku_a_{self._n1}_{self._n2}')
 
@@ -283,9 +317,10 @@ class IchimokuIndicator(IndicatorMixin):
         Returns:
             pandas.Series: New feature generated.
         """
-        spanb = 0.5 * (self._high.rolling(self._n3, min_periods=0).max()
-                       + self._low.rolling(self._n3, min_periods=0).min())
-        spanb = spanb.shift(self._n2, fill_value=spanb.mean()) if self._visual else spanb
+        spanb = (self._high.rolling(self._n3, min_periods=0).max()
+                       + self._low.rolling(self._n3, min_periods=0).min()) / 2.0
+        #spanb = spanb.shift(self._n2, fill_value=spanb.mean()) if self._visual else spanb
+        spanb = spanb.shift(30)
         spanb = self.check_fillna(spanb, method='backfill')
         return pd.Series(spanb, name=f'ichimoku_b_{self._n1}_{self._n2}')
 
@@ -998,8 +1033,7 @@ def kst_sig(close, r1=10, r2=15, r3=20, r4=30, n1=10, n2=10, n3=10, n4=15, nsig=
     return KSTIndicator(
         close=close, r1=r1, r2=r2, r3=r3, r4=r4, n1=n1, n2=n2, n3=n3, n4=n4, nsig=nsig, fillna=fillna).kst_sig()
 
-
-def ichimoku_a(high, low, n1=9, n2=26, visual=False, fillna=False):
+def tenkan(high, low, close, n1=9, visual=False, fillna=False):
     """Ichimoku Kinkō Hyō (Ichimoku)
 
     It identifies the trend and look for potential signals within that trend.
@@ -1017,10 +1051,71 @@ def ichimoku_a(high, low, n1=9, n2=26, visual=False, fillna=False):
     Returns:
         pandas.Series: New feature generated.
     """
-    return IchimokuIndicator(high=high, low=low, n1=n1, n2=n2, n3=52, visual=visual, fillna=fillna).ichimoku_a()
+    return IchimokuIndicator(high=high, low=low, close=close,n1=n1, visual=visual, fillna=fillna).tenkan()
+
+def kijun(high, low, close, n2=26, visual=False, fillna=False):
+    """Ichimoku Kinkō Hyō (Ichimoku)
+
+    It identifies the trend and look for potential signals within that trend.
+
+    http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:ichimoku_cloud
+
+    Args:
+        high(pandas.Series): dataset 'High' column.
+        low(pandas.Series): dataset 'Low' column.
+        n1(int): n1 low period.
+        n2(int): n2 medium period.
+        visual(bool): if True, shift n2 values.
+        fillna(bool): if True, fill nan values.
+
+    Returns:
+        pandas.Series: New feature generated.
+    """
+    return IchimokuIndicator(high=high, low=low, close=close,n2=n2, visual=visual, fillna=fillna).kijun()
+
+def chikou(high, low, close, n2=26, visual=False, fillna=False):
+    """Ichimoku Kinkō Hyō (Ichimoku)
+
+    It identifies the trend and look for potential signals within that trend.
+
+    http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:ichimoku_cloud
+
+    Args:
+        high(pandas.Series): dataset 'High' column.
+        low(pandas.Series): dataset 'Low' column.
+        n1(int): n1 low period.
+        n2(int): n2 medium period.
+        visual(bool): if True, shift n2 values.
+        fillna(bool): if True, fill nan values.
+
+    Returns:
+        pandas.Series: New feature generated.
+    """
+    return IchimokuIndicator(high=high, low=low, close=close, n2=n2, visual=visual, fillna=fillna).chikou()
 
 
-def ichimoku_b(high, low, n2=26, n3=52, visual=False, fillna=False):
+def ichimoku_a(high, low, close, n1=9, n2=26, visual=False, fillna=False):
+    """Ichimoku Kinkō Hyō (Ichimoku)
+
+    It identifies the trend and look for potential signals within that trend.
+
+    http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:ichimoku_cloud
+
+    Args:
+        high(pandas.Series): dataset 'High' column.
+        low(pandas.Series): dataset 'Low' column.
+        n1(int): n1 low period.
+        n2(int): n2 medium period.
+        visual(bool): if True, shift n2 values.
+        fillna(bool): if True, fill nan values.
+
+    Returns:
+        pandas.Series: New feature generated.
+    """
+    return IchimokuIndicator(high=high, low=low, close=close,n1=n1, n2=n2, n3=52, visual=visual, fillna=fillna).ichimoku_a()
+
+
+def ichimoku_b(high, low, close, n2=26, n3=52, visual=False, fillna=False):
     """Ichimoku Kinkō Hyō (Ichimoku)
 
     It identifies the trend and look for potential signals within that trend.
@@ -1038,7 +1133,7 @@ def ichimoku_b(high, low, n2=26, n3=52, visual=False, fillna=False):
     Returns:
         pandas.Series: New feature generated.
     """
-    return IchimokuIndicator(high=high, low=low, n1=9, n2=n2, n3=n3, visual=visual, fillna=fillna).ichimoku_b()
+    return IchimokuIndicator(high=high, low=low, close=close,n1=9, n2=n2, n3=n3, visual=visual, fillna=fillna).ichimoku_b()
 
 
 def aroon_up(close, n=25, fillna=False):
